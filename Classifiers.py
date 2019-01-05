@@ -10,7 +10,7 @@ from pprint import pprint
 
 class SOM:
 
-	def __init__(self, input_matrix, num_nodes = 0, num_iterations = 10000, learning_rate =.1):
+	def __init__(self, input_matrix, num_nodes = 0, num_iterations = 2000, learning_rate = .45):
 
 		# if unspecified number of nodes, use heuristical method from SOM Toolbix
 		if num_nodes == 0:
@@ -18,12 +18,12 @@ class SOM:
 
 		# annoying cornercase when dealing with one dimensional data
 		if input_matrix.shape[-1] == len(input_matrix):
-			self.lattice = np.random.rand(num_nodes, num_nodes, 1)	
+			self.lattice = np.random.rand(num_nodes, num_nodes, 1)
 		else:
 			self.lattice = np.random.rand(num_nodes, num_nodes, input_matrix.shape[-1])
 
 		self.delta = np.zeros_like(self.lattice)
-
+		print(self.lattice)
 		print('[SOM] Lattice created with %d nodes' % num_nodes)
 
 		self.num_iterations = num_iterations
@@ -40,6 +40,19 @@ class SOM:
 		return int(math.sqrt(np.dot(value, value))) + round(math.sqrt(np.dot(value, value)) - int(math.sqrt(np.dot(value, value))), 2)
 
     # default function to display data at each iteration, can be overidden by user. This one displays the weight matrix as a heatmap
+	def show(self, stick):
+		plt.figure(1)
+		self.display()
+
+		plt.figure(2)
+		self.distance_map()
+
+		if stick:
+			plt.show()
+		else:
+			plt.draw()
+			plt.pause(0.001)
+
 	def display(self):
 		plt.clf()
 		
@@ -51,24 +64,24 @@ class SOM:
 		plt.matshow(tmp, fignum = 1, cmap = plt.cm.OrRd)
 		for i in range(self.lattice.shape[0]):
 			for j in range(self.lattice.shape[1]):
-				plt.text(j, i, str(tmp[i][j]), horizontalalignment = 'center', verticalalignment = 'center')
+				pass#plt.text(j, i, str(tmp[i][j]), horizontalalignment = 'center', verticalalignment = 'center')
 
 
 		plt.gcf().gca().add_artist(plt.Circle((self.iteration_info[2][1], self.iteration_info[2][0]), self.iteration_info[1], color='xkcd:azure', alpha = 0.2))
 		plt.suptitle('Iteration %d' % self.iteration_info[0])
 		plt.title('Radius = %f  BMU = (%d, %d) which is %f ~ %f' % (self.iteration_info[1], self.iteration_info[2][0], self.iteration_info[2][1], self.vector_to_scalar(self.lattice[self.iteration_info[2][0]][self.iteration_info[2][1]]), self.vector_to_scalar(self.iteration_info[3])))
-		plt.draw()
-		plt.pause(0.001)
+		#plt.draw()
+		#plt.pause(0.001)
 
 
 	# trains self organizing map on previously specified amount of iterations
-	def train(self, display = display, animate = True):
+	def train(self, animate = False):
 		orig_radius = (self.lattice.shape[0]) / 2 # change to double if needed
 		for iteration in range(self.num_iterations):
 
 			# get random vector from input
 			input_vector = self.input_matrix[random.randint(0, len(self.input_matrix)-1)]
-
+			
 			# find BMU of given vector
 			BMU = self.find_BMU(input_vector)
 			#print('[SOM]\tBMU of', input_vector,'is located at', BMU[0],'which =', self.lattice[BMU[0][0],BMU[0][1]], 'with a distance of', BMU[1])
@@ -78,8 +91,9 @@ class SOM:
 			learning_rate = self.orig_rate * math.exp(float(-iteration) / self.num_iterations)
 
 			self.iteration_info = [iteration, radius, BMU[0], input_vector]
-			display(self)
 
+			if animate:
+				self.show(False)
 			# alter weight of all items in neighborhood
 			for i in range(self.lattice.shape[0]):
 				for j in range(self.lattice.shape[1]):
@@ -88,8 +102,6 @@ class SOM:
 						theta = math.exp(-(dist * dist) / (2 * radius ** 2))
 						self.delta[i][j] = self.lattice[i][j]
 						self.lattice[i][j] += theta * learning_rate * (np.squeeze(np.asarray(input_vector)) - self.lattice[i][j])
-
-			print(np.sum(np.abs(self.delta - self.lattice)))
 
 		
 	# attempts to classify given input vector. Currently incomplete, currently just finds best matching unit
@@ -101,7 +113,7 @@ class SOM:
 		BMU = [[-1, -1], sys.maxsize]
 		for i in range(self.lattice.shape[0]):
 				for j in range(self.lattice.shape[1]):
-					dist = math.sqrt((input_vector - self.lattice[i][j]) * (input_vector - self.lattice[i][j]))
+					dist = math.sqrt(np.dot((input_vector - self.lattice[i][j]),(input_vector - self.lattice[i][j])))
 					if dist < BMU[1]:
 						BMU[0] = [i, j]
 						BMU[1] = dist
@@ -112,6 +124,30 @@ class SOM:
 	def get_lattice(self):
 		return self.lattice
 
+	def distance_map(self):
+		plt.clf()
+		mean_vector = np.array([0, 0, 0, 0], dtype = 'float64')
+		for xvector in self.lattice:
+			for yvector in xvector:
+				mean_vector += yvector
+		mean_vector /= (self.lattice.shape[0] * self.lattice.shape[1])
+		relative_mat = np.zeros((self.lattice.shape[0], self.lattice.shape[1]), dtype = 'float64')
+
+		for x in range(len(self.lattice)):
+			for y in range(len(self.lattice[x])):
+				relative_mat[x][y] = math.sqrt(np.dot(mean_vector - self.lattice[x][y], mean_vector - self.lattice[x][y]))
+				
+		plt.matshow(relative_mat, fignum = 2, cmap = plt.cm.OrRd)
+		'''
+		for i in range(self.lattice.shape[0]):
+			for j in range(self.lattice.shape[1]):
+				plt.text(j, i, str(tmp[i][j]), horizontalalignment = 'center', verticalalignment = 'center')
+		'''		
+
+
+		plt.gcf().gca().add_artist(plt.Circle((self.iteration_info[2][1], self.iteration_info[2][0]), self.iteration_info[1], color='xkcd:azure', alpha = 0.2))
+		plt.suptitle('Distance Map')
+		plt.title('Radius = %f  BMU = (%d, %d) which is %f ~ %f' % (self.iteration_info[1], self.iteration_info[2][0], self.iteration_info[2][1], self.vector_to_scalar(relative_mat[self.iteration_info[2][0]][self.iteration_info[2][1]]), self.vector_to_scalar(self.iteration_info[3])))
 class KMeans:
 
 	def __init__(self, k = 2):
@@ -119,6 +155,7 @@ class KMeans:
 		self.centroid = np.zeros(2)
 
 	def train(self, data):
+
 		self.centroid = np.array([np.random.randint(min(data), high = max(data)) for x in range(self.k)])
 
 		prev_centroid = np.zeros_like(self.centroid)
@@ -156,7 +193,7 @@ class AgglomerativeCluster:
 		self.clusters = []
 
 	def train(self, data):
-		self.clusters = [self.Cluster(x) for x in data]
+		self.clusters = [self.Cluster(self.mag(x)) for x in data]
 
 		ind = 0
 		while len(self.clusters) > self.num_clusters:
@@ -191,14 +228,16 @@ class AgglomerativeCluster:
 		else:
 			return index + 1
 
+	def mag(self, arr):
+		return np.sqrt(arr.dot(arr))
 
 	def classify(self, input_vector):
 		distances = []
 		for cluster in self.clusters:
 			mind = sys.maxsize
 			for value in cluster.value:
-				if abs(input_vector - value) < mind:
-					mind = abs(input_vector - value)
+				if abs(self.mag(input_vector) - value) < mind:
+					mind = abs(self.mag(input_vector) - value)
 			distances.append(mind)
 
 		return np.argmin(distances)
@@ -244,4 +283,3 @@ class kNearestNeighbor:
 				p_dict[_class] = 1
 
 		return max(p_dict.items(), key = itemgetter(1))[0]
-

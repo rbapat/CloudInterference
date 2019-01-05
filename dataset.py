@@ -1,21 +1,40 @@
 import numpy as np
 
 def get_data():
+	data = []
+	labels = []
 
-	with open("good_data.txt", 'r') as file:
-		good_data = [float(item) for item in file.read().split('\n')[:-1]]
+	with open("bad_details.txt", 'r') as file:
+		for item in file.read().split('\n')[:-1]:
+				arr = [float(i) for i in item.split(',')]
+				data.append(arr[:4])
+				labels.append(arr[4:])
+	data, labels = np.array(data), np.array(labels)
+	p = np.random.permutation(len(data))
+	data, labels = data[p], labels[p]
 
-	with open("bad_data.txt", 'r') as file:
-		bad_data = [float(item) for item in file.read().split('\n')[:-1]]
+	return data[:int(len(data) * 0.8)], labels[:int(len(labels) * 0.8)], data[int(len(data)*0.8):], labels[int(len(labels)*0.8):]
 
-	return good_data, bad_data, np.random.permutation(good_data + bad_data)
+def remove_outliers(arr):
+	arr = np.array(arr)
 
-def get_kNN_data(good_data, bad_data):
-	X = []
-	for x in good_data:
-		X.append([0, x])
+	dists = np.array([])
+	neighbors = []
+	for coord in arr:
+		neighbors.append(np.sort(np.linalg.norm(arr - coord, axis = 1))[:8])
+		dists = np.concatenate((dists, neighbors[-1]))
+	dev = np.std(dists)
+	mean = np.mean(dists)
+	
+	new = []
+	for index, neighbor in enumerate(neighbors):
+		coord = arr[index]
+		if np.mean(neighbor) > mean + 2 * dev:
+			pass
+		else:
+			new.append(coord)
+	
+	return np.array(new)
 
-	for x in bad_data:
-		X.append([1, x])
-
-	return X
+def dont_remove_outliers(arr):
+	return np.array(arr)
